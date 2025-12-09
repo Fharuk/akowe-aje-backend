@@ -1,0 +1,6 @@
+echo ".env" >> .gitignore
+echo "__pycache__/" >> .gitignore
+echo "*.mp3" >> .gitignore
+echo "*.pdf" >> .gitignore
+echo "*.wav" >> .gitignore
+echo "*.ogg" >> .gitignore

@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+requests
+python-multipart
+supabase
+python-dotenv
+librosa
+soundfile
+torch
+transformers
+accelerate
+huggingface_hub
+twilio
+fpdf
+edge-tts
+aiofiles
+pillow
