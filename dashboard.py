@@ -5,7 +5,7 @@ from supabase import create_client
 import os
 from dotenv import load_dotenv
 
-# Load secrets (works for both local .env and Streamlit Cloud secrets)
+# secrets 
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL") or st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") or st.secrets["SUPABASE_KEY"]
@@ -20,7 +20,7 @@ supabase = init_connection()
 # Page Config
 st.set_page_config(page_title="AkoweAje Live Ledger", page_icon="🦅", layout="wide")
 
-# Custom CSS for "Vibe"
+# Custom CSS 
 st.markdown("""
     <style>
     .big-font { font-size: 24px !important; font-weight: bold; }
@@ -45,7 +45,7 @@ if not df.empty:
     df['amount'] = pd.to_numeric(df['amount'], errors='coerce').fillna(0)
     df['profit'] = pd.to_numeric(df['profit'], errors='coerce').fillna(0)
 
-    # --- KPI ROW ---
+    #  KPI ROW 
     col1, col2, col3, col4 = st.columns(4)
     
     total_sales = df[df['intent'] == 'SALE']['amount'].sum()
@@ -64,7 +64,7 @@ if not df.empty:
 
     st.divider()
 
-    # --- CHARTS ROW ---
+    #  CHARTS ROW 
     c1, c2 = st.columns(2)
 
     with c1:
@@ -84,7 +84,7 @@ if not df.empty:
         fig_pie = px.pie(top_items, values='count', names='item', title="Top Selling Items", hole=0.4)
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    # --- LIVE TABLE ---
+    #  LIVE TABLE 
     st.subheader("📝 Recent Transactions (Live Feed)")
     st.dataframe(
         df[['created_at', 'user_phone', 'intent', 'item', 'amount', 'profit']].sort_values(by='created_at', ascending=False),
