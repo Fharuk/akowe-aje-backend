@@ -15,3 +15,8 @@ fpdf
 edge-tts
 aiofiles
 pillow
+streamlit
+pandas
+plotly
+supabase
+python-dotenv
