@@ -1,116 +1,100 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from supabase import create_client
 import os
-import time
 from dotenv import load_dotenv
-from supabase import create_client, Client
 
-# 1. Config & Setup
-st.set_page_config(
-    page_title="AkoweAje Mission Control",
-    page_icon="📊",
-    layout="wide"
-)
-
+# Load secrets (works for both local .env and Streamlit Cloud secrets)
 load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL") or st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or st.secrets["SUPABASE_KEY"]
 
-# Initialize Database Connection
-try:
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY")
-    supabase: Client = create_client(url, key)
-except:
-    st.error("❌ Supabase Keys missing! Check .env file.")
-    st.stop()
+# Initialize Supabase
+@st.cache_resource
+def init_connection():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 2. Custom CSS for "Dark Mode" Finance Look
+supabase = init_connection()
+
+# Page Config
+st.set_page_config(page_title="AkoweAje Live Ledger", page_icon="🦅", layout="wide")
+
+# Custom CSS for "Vibe"
 st.markdown("""
-<style>
-    .metric-card {
-        background-color: #0e1117;
-        border: 1px solid #303030;
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-    }
-    .stDataFrame { border: 1px solid #303030; }
-</style>
-""", unsafe_allow_html=True)
+    <style>
+    .big-font { font-size: 24px !important; font-weight: bold; }
+    .metric-card { background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 5px solid #2e7d32; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# 3. The Header
-col_logo, col_title = st.columns([1, 5])
-with col_logo:
-    st.header("🦅")
-with col_title:
-    st.title("AkoweAje Mission Control")
-    st.caption("Real-Time Financial Intelligence for the Informal Economy | Powered by **Awarri**")
+# Title
+st.title("🦅 AkoweAje: The Informal Economy Ledger")
+st.markdown("Real-time financial tracking for traders (Powered by Awarri & Llama-3)")
 
-st.divider()
+# Fetch Data
+def get_data():
+    response = supabase.table("transactions").select("*").execute()
+    return pd.DataFrame(response.data)
 
-# 4. The Live Data Loop
-placeholder = st.empty()
+df = get_data()
 
-while True:
-    with placeholder.container():
-        # A. Fetch Data
-        try:
-            # We fetch slightly more data to ensure charts look good
-            response = supabase.table("transactions").select("*").order("created_at", desc=True).limit(100).execute()
-            data = response.data
-        except Exception as e:
-            st.error(f"Database Error: {e}")
-            time.sleep(5)
-            continue
+if not df.empty:
+    # Convert types
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['amount'] = pd.to_numeric(df['amount'], errors='coerce').fillna(0)
+    df['profit'] = pd.to_numeric(df['profit'], errors='coerce').fillna(0)
 
-        if not data:
-            st.info("Waiting for transactions... Send a voice note!")
-            time.sleep(2)
-            continue
+    # --- KPI ROW ---
+    col1, col2, col3, col4 = st.columns(4)
+    
+    total_sales = df[df['intent'] == 'SALE']['amount'].sum()
+    total_profit = df[df['intent'] == 'SALE']['profit'].sum()
+    tx_count = len(df)
+    unique_traders = df['user_phone'].nunique()
 
-        # B. Process Data
-        df = pd.DataFrame(data)
-        
-        # Calculate Metrics
-        total_sales = df[df['intent'] == 'SALE']['amount'].sum()
-        total_debt = df[df['intent'] == 'DEBT']['amount'].sum()
-        transaction_count = len(df)
-        
-        # C. KPI Row
-        kpi1, kpi2, kpi3 = st.columns(3)
-        
-        with kpi1:
-            st.metric(label="💰 Total Sales Recorded", value=f"₦{total_sales:,.0f}")
-        with kpi2:
-            st.metric(label="📕 Outstanding Debt", value=f"₦{total_debt:,.0f}")
-        with kpi3:
-            st.metric(label="📊 Transactions Logged", value=transaction_count)
+    with col1:
+        st.metric("💰 Total Volume", f"₦{total_sales:,.0f}")
+    with col2:
+        st.metric("📈 Total Profit", f"₦{total_profit:,.0f}")
+    with col3:
+        st.metric("🧾 Transactions", tx_count)
+    with col4:
+        st.metric("👥 Active Traders", unique_traders)
 
-        # D. Visuals Row
-        chart_col, table_col = st.columns([2, 3])
-        
-        with chart_col:
-            st.subheader("Sales Velocity")
-            if not df.empty:
-                # Group by Item for a clean chart
-                sales_df = df[df['intent'] == 'SALE']
-                if not sales_df.empty:
-                    chart_data = sales_df.groupby('item')['amount'].sum().reset_index()
-                    fig = px.bar(chart_data, x='item', y='amount', color='amount', 
-                                 color_continuous_scale='Greens', template='plotly_dark')
-                    
-                    # --- CRITICAL FIX: Unique Key for every loop iteration ---
-                    # We also switched to width="stretch" to stop the warnings
-                    st.plotly_chart(fig, key=f"sales_chart_{time.time()}", selection_mode="points")
-                else:
-                    st.info("No sales data yet.")
+    st.divider()
 
-        with table_col:
-            st.subheader("🔴 Live Ledger Feed")
-            # Clean up the table for display
-            if not df.empty:
-                display_df = df[['created_at', 'intent', 'item', 'amount', 'customer']]
-                st.dataframe(display_df, use_container_width=True, hide_index=True)
+    # --- CHARTS ROW ---
+    c1, c2 = st.columns(2)
 
-        # Refresh Rate (Slower to prevent UI glitches)
-        time.sleep(3)
+    with c1:
+        st.subheader("📊 Sales Velocity")
+        # Group by Date
+        sales_over_time = df[df['intent'] == 'SALE'].groupby(df['created_at'].dt.date)['amount'].sum().reset_index()
+        fig_line = px.line(sales_over_time, x='created_at', y='amount', title="Daily Revenue Trend", markers=True)
+        fig_line.update_layout(xaxis_title="Date", yaxis_title="Amount (₦)")
+        st.plotly_chart(fig_line, use_container_width=True)
+
+    with c2:
+        st.subheader("📦 Product Mix")
+        # Extract product names roughly or just count intents if items aren't clean
+        # Let's clean up 'item' for a pie chart
+        top_items = df[df['intent'] == 'SALE']['item'].value_counts().head(5).reset_index()
+        top_items.columns = ['item', 'count']
+        fig_pie = px.pie(top_items, values='count', names='item', title="Top Selling Items", hole=0.4)
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+    # --- LIVE TABLE ---
+    st.subheader("📝 Recent Transactions (Live Feed)")
+    st.dataframe(
+        df[['created_at', 'user_phone', 'intent', 'item', 'amount', 'profit']].sort_values(by='created_at', ascending=False),
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # Auto-refresh button
+    if st.button('🔄 Refresh Data'):
+        st.rerun()
+
+else:
+    st.info("Waiting for first transaction... Send a message to the bot!")
